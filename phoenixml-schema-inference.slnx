@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PhoenixmlDb.Schema.Inference/PhoenixmlDb.Schema.Inference.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/PhoenixmlDb.Schema.Inference.Tests/PhoenixmlDb.Schema.Inference.Tests.csproj" />
+  </Folder>
+</Solution>
