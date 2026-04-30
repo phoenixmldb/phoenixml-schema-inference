@@ -1,61 +1,114 @@
-name: ci
+name: CI
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
-  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
 
 jobs:
-  build-and-test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+  build:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
         with:
-          global-json-file: global.json
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Determine version from git tags
+        id: version
+        run: |
+          # Use latest tag as base version; append commit count since tag for pre-release builds.
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          BASE_VERSION="${LATEST_TAG#v}"
+          COMMITS_SINCE=$(git rev-list --count "${LATEST_TAG}..HEAD" 2>/dev/null || git rev-list --count HEAD)
+          if [ "$COMMITS_SINCE" = "0" ]; then
+            VERSION="$BASE_VERSION"
+          else
+            VERSION="${BASE_VERSION}.${COMMITS_SINCE}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION} (tag: ${LATEST_TAG}, +${COMMITS_SINCE} commits)"
 
       - name: Restore
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.version }}
+        run: dotnet build -c Release --no-restore -p:Version="$BUILD_VERSION"
 
       - name: Test
-        run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+        run: dotnet test -c Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.os }}
+          name: test-results
           path: TestResults/
           retention-days: 7
 
-  pack:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
       - name: Pack
-        run: dotnet pack --configuration Release --output ./artifacts
+        if: github.event_name == 'push'
+        env:
+          PKG_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet pack src/PhoenixmlDb.Schema.Inference -c Release --no-build \
+            -p:PackageVersion="$PKG_VERSION" -o ./artifacts
 
-      - name: Upload nupkg
+      - name: Upload artifacts
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: nupkg
+          name: nuget-packages
           path: ./artifacts/*.nupkg
-          retention-days: 30
+
+  publish:
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./artifacts
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Login to NuGet via trusted publisher
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: endpointsystems
+
+      - name: Push to NuGet
+        env:
+          NUGET_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          for pkg in ./artifacts/*.nupkg; do
+            dotnet nuget push "$pkg" \
+              --api-key "$NUGET_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done

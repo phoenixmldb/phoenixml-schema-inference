@@ -5,8 +5,7 @@ namespace PhoenixmlDb.Schema.Inference.Internal;
 
 /// <summary>
 /// Sanitizes arbitrary strings (e.g., JSON property names) into valid XML element
-/// names, and escapes XML text content. Logic preserved verbatim from ConduitXP's
-/// SchemaGenerator helpers so JSON-to-XML output is byte-compatible.
+/// names, and escapes XML text content.
 /// </summary>
 internal static class XmlNameSanitizer
 {

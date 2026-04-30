@@ -33,7 +33,7 @@ public class JsonToXmlTests
     [Fact]
     public void InvalidXmlNameCharsInKeysAreSanitized()
     {
-        // Sanitizer rules from ConduitXP source:
+        // Sanitizer rules:
         //  - leading "@" stripped
         //  - spaces become dashes
         //  - non-alphanumeric/dash/underscore chars dropped

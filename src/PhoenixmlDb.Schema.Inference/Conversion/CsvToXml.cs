@@ -7,7 +7,7 @@ namespace PhoenixmlDb.Schema.Inference.Conversion;
 /// Converts delimited text (CSV/TSV) to XML. The first row is treated as the
 /// header; each subsequent row produces one row-element with one child per
 /// column. Quoted fields with embedded delimiters and escaped quotes are
-/// supported. Logic preserved verbatim from ConduitXP.
+/// supported.
 /// </summary>
 public static class CsvToXml
 {

@@ -8,8 +8,9 @@ namespace PhoenixmlDb.Schema.Inference.Generation;
 /// (auto-detected by extension), converts the input to XML when needed, and
 /// runs <see cref="SchemaInferenceEngine"/> to produce an XSD.
 ///
-/// EDI input is intentionally NOT supported in this open-source package — it
-/// remains in ConduitXP because the disassembly logic is domain-specific.
+/// EDI input is intentionally NOT supported here. EDI disassembly is
+/// domain-specific and depends on transport pipeline infrastructure; consume
+/// this library from a host that brings its own EDI parser if needed.
 /// </summary>
 public static class SchemaGenerator
 {
@@ -31,7 +32,7 @@ public static class SchemaGenerator
             ".XML" or ".XSL" or ".XSLT" => FromXml(content),
             ".EDI" or ".X12" => throw new NotSupportedException(
                 "EDI input is not supported in PhoenixmlDb.Schema.Inference. " +
-                "Use ConduitXP for EDI disassembly."),
+                "Convert EDI to XML upstream and pass via FromXml."),
             _ => FromXml(content)
         };
     }
