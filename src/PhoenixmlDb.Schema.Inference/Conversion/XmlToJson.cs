@@ -370,13 +370,15 @@ public static class XmlToJson
 
         if (typeName.Equals("xs:boolean", StringComparison.Ordinal))
         {
+            // XSD canonical lexical space is lowercase "true"/"false", but be tolerant
+            // of common alternates (capitalized, "1"/"0") on input.
             var trimmed = value.Trim();
-            if (trimmed.Equals("true", StringComparison.Ordinal))
+            if (trimmed.Equals("true", StringComparison.OrdinalIgnoreCase) || trimmed == "1")
             {
                 sb.Append("true");
                 return;
             }
-            if (trimmed.Equals("false", StringComparison.Ordinal))
+            if (trimmed.Equals("false", StringComparison.OrdinalIgnoreCase) || trimmed == "0")
             {
                 sb.Append("false");
                 return;

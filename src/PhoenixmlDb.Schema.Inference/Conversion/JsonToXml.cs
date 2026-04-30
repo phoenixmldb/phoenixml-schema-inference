@@ -52,7 +52,7 @@ public static class JsonToXml
                             }
                             else
                             {
-                                sb.Append(XmlNameSanitizer.EscapeXml(item.ToString()));
+                                sb.Append(XmlNameSanitizer.EscapeXml(LexicalValue(item)));
                             }
                             sb.AppendLine($"</{name}>");
                         }
@@ -66,7 +66,7 @@ public static class JsonToXml
                     else
                     {
                         var value = prop.Value.ValueKind == JsonValueKind.Null
-                            ? "" : XmlNameSanitizer.EscapeXml(prop.Value.ToString());
+                            ? "" : XmlNameSanitizer.EscapeXml(LexicalValue(prop.Value));
                         sb.AppendLine($"{indent}<{name}>{value}</{name}>");
                     }
                 }
@@ -85,15 +85,22 @@ public static class JsonToXml
                     }
                     else
                     {
-                        sb.Append(XmlNameSanitizer.EscapeXml(item.ToString()));
+                        sb.Append(XmlNameSanitizer.EscapeXml(LexicalValue(item)));
                     }
                     sb.AppendLine($"</{itemName}>");
                 }
                 break;
 
             default:
-                sb.Append(XmlNameSanitizer.EscapeXml(element.ToString()));
+                sb.Append(XmlNameSanitizer.EscapeXml(LexicalValue(element)));
                 break;
         }
     }
+
+    private static string LexicalValue(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.True => "true",
+        JsonValueKind.False => "false",
+        _ => element.ToString()
+    };
 }
