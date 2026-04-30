@@ -3,6 +3,7 @@
     <RootNamespace>PhoenixmlDb.Schema.Inference</RootNamespace>
     <Description>Open-source XSD inference and JSON/CSV/XML conversion for .NET. Observes documents to produce progressively-refined schemas; supports schema-aware XML↔JSON round-trip.</Description>
     <PackageTags>xml;xsd;schema;inference;json;csv;phoenixml</PackageTags>
+    <NoWarn>CA1305;CS1591;CA1720;CA1002</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PhoenixmlDb.Schema.Inference.Tests" />
