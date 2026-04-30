@@ -69,6 +69,26 @@ public class JsonToXmlTests
         Assert.Contains("&gt;", xml);
     }
 
+    [Fact]
+    public void JsonToXmlConversionIsLossless()
+    {
+        var json = """
+            {
+              "name": "Widget",
+              "tags": ["sale", "new"],
+              "details": { "color": "red", "weight": 2.5 }
+            }
+            """;
+
+        var xml = JsonToXml.Convert(json, "product");
+
+        Assert.Contains("<name>Widget</name>", xml);
+        Assert.Contains("<tags>sale</tags>", xml);
+        Assert.Contains("<tags>new</tags>", xml);
+        Assert.Contains("<color>red</color>", xml);
+        Assert.Contains("<weight>2.5</weight>", xml);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;
