@@ -79,11 +79,13 @@ jobs:
 
   publish:
     needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    # Only publish on tagged releases. Untagged main pushes still pack and upload
+    # the artifact so it's available for local download + manual publish via
+    # `dotnet nuget push --api-key "$PHOENIXML_NUGET_API"` if CI publish ever fails.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -96,15 +98,9 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: 'preview'
 
-      - name: Login to NuGet via trusted publisher
-        id: nuget-login
-        uses: NuGet/login@v1
-        with:
-          user: endpointsystems
-
       - name: Push to NuGet
         env:
-          NUGET_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           for pkg in ./artifacts/*.nupkg; do
             dotnet nuget push "$pkg" \
