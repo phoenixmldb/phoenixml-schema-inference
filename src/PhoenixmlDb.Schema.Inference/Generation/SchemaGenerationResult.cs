@@ -18,6 +18,9 @@ public sealed class SchemaGenerationResult
     /// <summary>Inference summary with element details.</summary>
     public SchemaInferenceSummary? Summary { get; init; }
 
+    /// <summary>For JSON input: what was observed, by JSON path. Null for other inputs.</summary>
+    public JsonInferenceSummary? JsonSummary { get; init; }
+
     /// <summary>Description of the source format.</summary>
     public required string Source { get; init; }
 }

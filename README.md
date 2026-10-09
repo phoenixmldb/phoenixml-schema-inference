@@ -37,12 +37,42 @@ using PhoenixmlDb.Schema.Inference.Conversion;
 var result = SchemaGenerator.FromXml(xmlContent);
 Console.WriteLine(result.Xsd);
 
-// JSON in → XSD out (JSON is converted to XML internally)
+// JSON in → XSD out (inferred from the JSON; result.Xml is the element-per-key XML)
 var fromJson = SchemaGenerator.FromJson(jsonContent, rootElement: "orders");
 
 // JSON round-trip with type recovery
 var roundTrippedJson = XmlToJson.Convert(fromJson.Xml, fromJson.Xsd);
 ```
+
+## Schemas from JSON
+
+A schema is inferred from the JSON itself, not from an XML rendering of it, so what JSON says
+outright is kept: an array is an array when it has one item or none, a number is a number and
+a string of digits is a string, and `null` is nillable (written as `xsi:nil="true"`).
+
+```csharp
+var engine = new JsonSchemaInferenceEngine();
+engine.Observe(json1);
+engine.Observe(json2);            // or ObserveJsonXml(...) for the fn:json-to-xml form
+
+string xsd = engine.GenerateXsd("order");      // element-per-key XML: every key typed
+var summary = engine.GetSummary();             // by JSON path: $.lines[*].sku, kinds, required, nullable
+string coarse = engine.GenerateJsonXmlXsd();   // for the fn:json-to-xml form
+```
+
+Two schemas, because XSD 1.0 cannot do both jobs at once:
+
+| | `GenerateXsd` (default) | `GenerateJsonXmlXsd` |
+|---|---|---|
+| Describes | element-per-key XML, as `JsonToXml` writes it | the XML form of JSON, as `fn:json-to-xml` writes it |
+| Type of each key | yes | no: only the kinds that appear, and one type for all numbers |
+| Required keys | yes, except in an object that has an array member | no |
+| Keys | become element names (sanitized) | checked against the observed keys; no key twice in a map |
+
+In XSD 1.0 an element's type cannot depend on the value of its `key` attribute, which is why
+the second schema cannot type a key. An object with an array member is a repeated choice of its
+members (any order, each typed), where a missing required member is not noticed; the summary
+still reports it.
 
 ## Used by
 
