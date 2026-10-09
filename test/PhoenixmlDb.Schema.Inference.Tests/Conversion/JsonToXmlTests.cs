@@ -48,13 +48,21 @@ public class JsonToXmlTests
     }
 
     [Fact]
-    public void NullValuesBecomeEmptyElements()
+    public void NullValuesBecomeNilElements()
     {
         var json = """{ "missing": null }""";
 
         var xml = JsonToXml.Convert(json, "doc");
 
-        Assert.Contains("<missing></missing>", xml);
+        // Not an empty element: that is the empty string, which JSON tells apart from null.
+        Assert.Contains("<missing xsi:nil=\"true\"/>", xml);
+        Assert.Contains("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"", xml);
+    }
+
+    [Fact]
+    public void ADocumentWithNoNullDeclaresNoXsi()
+    {
+        Assert.DoesNotContain("xsi", JsonToXml.Convert("""{ "a": "" }""", "doc"));
     }
 
     [Fact]

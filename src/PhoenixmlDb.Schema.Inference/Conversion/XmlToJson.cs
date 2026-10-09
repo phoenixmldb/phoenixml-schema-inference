@@ -22,7 +22,8 @@ namespace PhoenixmlDb.Schema.Inference.Conversion;
 ///     falls back to a JSON string instead of throwing — the XSD describes the
 ///     contract, but JSON can't carry it, so failing loud here just punishes
 ///     the JSON consumer.
-///   * Empty leaf elements (no children, no text) become empty JSON strings.
+///   * Empty leaf elements (no children, no text) become empty JSON strings;
+///     an element with xsi:nil="true" becomes JSON null.
 ///
 /// For lossless typed round-trip, prefer XML+XSD over JSON. This converter
 /// exists for pipelines that require JSON output, not because JSON is the
@@ -35,6 +36,14 @@ namespace PhoenixmlDb.Schema.Inference.Conversion;
 public static class XmlToJson
 {
     private static readonly XNamespace Xs = "http://www.w3.org/2001/XMLSchema";
+    private static readonly XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
+
+    /// <summary>The attributes that are data: not namespace declarations, not xsi:nil and its kin.</summary>
+    private static IEnumerable<XAttribute> DataAttributes(XElement element) =>
+        element.Attributes().Where(a => !a.IsNamespaceDeclaration && a.Name.Namespace != Xsi);
+
+    private static bool IsNil(XElement element) =>
+        (string?)element.Attribute(Xsi + "nil") is "true" or "1";
 
     // Integer-family XSD types: try parse as long.
     private static readonly HashSet<string> IntegerTypes = new(StringComparer.Ordinal)
@@ -120,6 +129,8 @@ public static class XmlToJson
         var isArray = maxOccursAttr is not null
             && (maxOccursAttr.Equals("unbounded", StringComparison.OrdinalIgnoreCase)
                 || (int.TryParse(maxOccursAttr, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n > 1));
+        // An array the schema could not mark with maxOccurs (a member of a repeated choice).
+        isArray |= (string?)xsElement.Attribute(Inference.JsonSchemaInferenceEngine.Hint + "array") == "true";
 
         // Check for a type= attribute (simple leaf).
         var typeAttr = (string?)xsElement.Attribute("type");
@@ -186,8 +197,14 @@ public static class XmlToJson
         string path,
         XsdLeafInfo? leafInfo)
     {
+        if (IsNil(element))
+        {
+            sb.Append("null");
+            return;
+        }
+
         var hasChildren = element.Elements().Any();
-        var hasAttributes = element.Attributes().Any();
+        var hasAttributes = DataAttributes(element).Any();
         var text = element.HasElements ? null : element.Value;
 
         if (!hasChildren && !hasAttributes)
@@ -202,7 +219,7 @@ public static class XmlToJson
         var childIndent = indent + "  ";
 
         // Attributes first, with "@" prefix.
-        var attrs = element.Attributes().ToList();
+        var attrs = DataAttributes(element).ToList();
         var children = element.Elements().ToList();
         var totalProps = attrs.Count + CountDistinctChildKeys(children);
         var propIndex = 0;
@@ -312,8 +329,14 @@ public static class XmlToJson
         string path,
         XsdLeafInfo? leafInfo)
     {
+        if (IsNil(element))
+        {
+            sb.Append("null");
+            return;
+        }
+
         var hasChildren = element.Elements().Any();
-        var hasAttributes = element.Attributes().Any();
+        var hasAttributes = DataAttributes(element).Any();
 
         if (!hasChildren && !hasAttributes)
         {
@@ -336,7 +359,7 @@ public static class XmlToJson
         sb.AppendLine("{");
         var childIndent = indent + "  ";
 
-        var attrs = element.Attributes().ToList();
+        var attrs = DataAttributes(element).ToList();
         var children = element.Elements().ToList();
         var totalProps = attrs.Count + CountDistinctChildKeys(children);
         var propIndex = 0;

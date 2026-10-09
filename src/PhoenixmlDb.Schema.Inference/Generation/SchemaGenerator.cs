@@ -37,14 +37,45 @@ public static class SchemaGenerator
         };
     }
 
-    /// <summary>Generates a schema from JSON input.</summary>
-    public static SchemaGenerationResult FromJson(string json, string rootElement = "root")
+    /// <summary>
+    /// Generates a schema from JSON input. The schema is inferred from the JSON itself, so an
+    /// array is an array when it has one item, a number is a number, and null is nillable.
+    /// </summary>
+    /// <param name="json">The JSON document.</param>
+    /// <param name="rootElement">The root element of the element-per-key XML.</param>
+    /// <param name="form">
+    /// Which XML the schema describes. <see cref="JsonSchemaForm.ElementPerKey"/>, the default,
+    /// types every key. <see cref="JsonSchemaForm.JsonXml"/> describes the XML form of JSON
+    /// (<c>fn:json-to-xml</c>), where XSD 1.0 can check kinds and keys and not the type of a key.
+    /// </param>
+    public static SchemaGenerationResult FromJson(string json, string rootElement = "root",
+        JsonSchemaForm form = JsonSchemaForm.ElementPerKey)
     {
         ArgumentNullException.ThrowIfNull(json);
         ArgumentNullException.ThrowIfNull(rootElement);
 
-        var xml = JsonToXml.Convert(json, rootElement);
-        return FromXmlInternal(xml, $"Generated from JSON. Root element: {rootElement}");
+        var engine = new JsonSchemaInferenceEngine();
+        engine.Observe(json);
+        if (form == JsonSchemaForm.JsonXml)
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(json);
+            return new SchemaGenerationResult
+            {
+                Xsd = engine.GenerateJsonXmlXsd(),
+                Xml = Internal.JsonXml.FromJson(document.RootElement).ToString(),
+                Summary = engine.GetElementSummary(rootElement),
+                JsonSummary = engine.GetSummary(),
+                Source = "Generated from JSON, for the XML form of JSON.",
+            };
+        }
+        return new SchemaGenerationResult
+        {
+            Xsd = engine.GenerateXsd(rootElement),
+            Xml = JsonToXml.Convert(json, rootElement),
+            Summary = engine.GetElementSummary(rootElement),
+            JsonSummary = engine.GetSummary(),
+            Source = $"Generated from JSON. Root element: {rootElement}",
+        };
     }
 
     /// <summary>Generates a schema from CSV input.</summary>
@@ -81,4 +112,19 @@ public static class SchemaGenerator
             Source = source
         };
     }
+}
+
+/// <summary>Which XML rendering of JSON a schema describes.</summary>
+public enum JsonSchemaForm
+{
+    /// <summary>
+    /// One element for each key, as <see cref="JsonToXml"/> writes it. Every key has its own type.
+    /// </summary>
+    ElementPerKey,
+
+    /// <summary>
+    /// The XML form of JSON that <c>fn:json-to-xml</c> writes: <c>map</c>, <c>array</c>,
+    /// <c>string</c>, <c>number</c>, <c>boolean</c>, <c>null</c>, with the key in an attribute.
+    /// </summary>
+    JsonXml,
 }
