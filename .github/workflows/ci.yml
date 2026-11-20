@@ -25,8 +25,11 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
-          dotnet-quality: 'preview'
+          # SDK 11 builds (global.json); the 8 and 10 runtimes run the older targets' tests.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+            11.0.x
 
       - name: Determine version from git tags
         id: version
@@ -77,8 +80,40 @@ jobs:
           name: nuget-packages
           path: ./artifacts/*.nupkg
 
+  # The same build and tests on SDK 10. global.json pins SDK 11; this job repoints it, so the
+  # projects build net10.0 alone (Directory.Build.props adds net11.0 only on SDK 11). It proves
+  # those builds need nothing from SDK 11, and that a host still on SDK 10 can build.
+  build-sdk10:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Select SDK 10
+        run: |
+          python3 - <<'PY'
+          import json
+          g = json.load(open("global.json"))
+          g["sdk"] = {"version": "10.0.100", "rollForward": "latestFeature"}
+          json.dump(g, open("global.json", "w"), indent=2)
+          PY
+          dotnet --version
+          case "$(dotnet --version)" in 10.*) ;; *) echo "::error::expected SDK 10"; exit 1 ;; esac
+
+      - name: Build
+        run: |
+          dotnet build -c Release
+
+      - name: Test
+        run: |
+          dotnet test -c Release --no-build
+
   publish:
-    needs: build
+    needs: [build, build-sdk10]
     # Only publish on tagged releases. Untagged main pushes still pack and upload
     # the artifact so it's available for local download + manual publish via
     # `dotnet nuget push --api-key "$PHOENIXML_NUGET_API"` if CI publish ever fails.
@@ -95,8 +130,11 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
-          dotnet-quality: 'preview'
+          # SDK 11 builds (global.json); the 8 and 10 runtimes run the older targets' tests.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+            11.0.x
 
       - name: Push to NuGet
         env:
